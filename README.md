@@ -26,20 +26,35 @@ install all required dependencies:
 pip install -r requirements.txt
 ```
 
-## How to use
-In the terminal, go to the repository directory and run the command
 ```Python
-python3 parse_tululu.py 1 10
+python parse_tululu_category.py
 ```
-For books with `id` numbers from `1` to `10`, texts will be downloaded 
-(nested `books` directory) and book covers (subdirectory `images` ).
-All nested directories are created automatically
+Running the script without additional parameters will activate the download of all books of a certain category according to the list (by default, "Science Fiction") to the current directory.
+Book texts are stored in the `books` subdirectory, book covers in the `images` subdirectory.
 
-If there is no option to download the text on the book page, in 
-the terminal window  a corresponding warning will appear.
+If it is not possible to download the text of the book, then a warning is displayed in the console.
 
-Also, the Terminal will display the titles for downloaded books, 
-their genres and comments to them (if any exists).
+### Command line options
+When running the script, it is recommended to use the following parameters:
+* `--category_page` (str). A link to the selected category is provided (for example, 'https://tululu.org/l55/')
+
+```python
+python parse_tululu_category.py --category_page https://tululu.org/l55/
+```
+
+* `--start_page` (int). Number of the start page of the category section to download. The default is 1.
+* `--end_page` (int). The end page of the genre section to download. If not specified, it will download
+all pages of the genre to the end.
+
+```python
+python parse_tululu_category.py --start_page 700
+python parse_tululu_category.py --start_page 700 --end_page 701
+
+```
+* `--dest_folder` (str). Download directory (by default, the root folder of the script).
+* `--path_json` (str). The name of the file to upload the result. Default: `books_info.json`.
+* `--skip_img`. Specify a "flag" to not upload book covers.
+* `--skip_txt`. Specify a "flag" to not download book texts.
 
 
 ## Project Goals

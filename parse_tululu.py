@@ -11,13 +11,15 @@ from urllib.parse import urljoin
 import argparse
 
 
-def get_list_nf_books():
+def get_list_nf_books(category, start, end):
     lst = []
-    for j in range(1, 2):
-        url = f'https://tululu.org/l55/{j}/'
+    for j in range(start, end + 1):
+        url = f'https://tululu.org/{category}/{j}/'
 
         response = requests.get(url)
         response.raise_for_status()
+        if response.history:
+            print(f'Обработка завершена, подготовлено к скачиванию {j - start} страниц')
 
         soup = BeautifulSoup(response.text, 'lxml')
 
@@ -45,10 +47,50 @@ def check_for_redirect(response):
         raise requests.HTTPError
 
 
+# def create_parser():
+#     parser = argparse.ArgumentParser(description='Скрипт для последовательного скачивания книг с сайта tululu.org ')
+#     parser.add_argument('start_index', help='С какого индекса книги (число) нужно начать скачивание', type=int)
+#     parser.add_argument('end_index', help='Каким индексом книги (число) нужно завершить скачивание', type=int)
+#     return parser
+
 def create_parser():
-    parser = argparse.ArgumentParser(description='Скрипт для последовательного скачивания книг с сайта tululu.org ')
-    parser.add_argument('start_index', help='С какого индекса книги (число) нужно начать скачивание', type=int)
-    parser.add_argument('end_index', help='Каким индексом книги (число) нужно завершить скачивание', type=int)
+    parser = argparse.ArgumentParser(description='Скачивание книг из раздела сайта "tululu.org" ')
+
+    parser.add_argument(
+        '--category_page',
+        help='Ссылка на раздел (жанр) библиотеки. Напр, (по умолч.) "https://tululu.org/l55/" - "фантастика"',
+        default='https://tululu.org/l55/',
+    )
+    parser.add_argument(
+        '--start_page',
+        help='Стартовая страница (:int) для скачивания',
+        type=int, default=1,
+    )
+    parser.add_argument(
+        '--end_page',
+        help='Финишная страница (:int) для для скачивания',
+        type=int, default=1,
+    )
+    parser.add_argument(
+        '--dest_folder',
+        help='Указать свой каталог для сохранения результатов.',
+        type=str,
+    )
+    parser.add_argument(
+        '--json_path',
+        help='Указать свой путь к файлу *.json с результатми.',
+        type=argparse.FileType('w'), default='books_info.json',
+    )
+    parser.add_argument(
+        '--skip_img',
+        help='Указать, чтобы не скачивать картинки.',
+        action='store_true',
+    )
+    parser.add_argument(
+        '--skip_txt',
+        help='Указать, чтобы не скачивать картинки.',
+        action='store_true',
+    )
     return parser
 
 
@@ -75,7 +117,7 @@ def parse_book_page(response):
     return book_title, book_author, cover_image_url, book_comments, book_genres
 
 
-def download_book_txt(book_id, filename, folder='books/'):
+def download_book_txt(book_id, filename, folder='books/', skip_txt=False, dest_folder=str(Path.cwd())):
     """Функция для скачивания текстовых файлов.
         Args:
             # url (str): Cсылка на текст, который хочется скачать.
@@ -87,21 +129,28 @@ def download_book_txt(book_id, filename, folder='books/'):
         """
     url = 'https://tululu.org/txt.php'
     payload = {'id': book_id}
-    Path(f'./{folder}').mkdir(parents=True, exist_ok=True)
+    # Path(f'{dest_folder}/{folder}').mkdir(parents=True, exist_ok=True)
+
+    fff = Path(dest_folder, folder)
+    Path(dest_folder, folder).mkdir(parents=True, exist_ok=True)
 
     response = requests.get(url, params=payload)
     response.raise_for_status()
     check_for_redirect(response)
 
-    filepath = Path(f'./{folder}/{sanitize_filename(filename)}.txt')
+    # filepath = Path(f'{dest_folder}/{folder}/{sanitize_filename(filename)}.txt')
+    filename = filename + '.txt'
+    filepath = Path(dest_folder, folder, sanitize_filename(filename))
+    print(filepath)
 
-    with open(filepath, 'wb') as file:
-        file.write(response.content)
+    if not skip_txt:
+        with open(filepath, 'wb') as file:
+            file.write(response.content)
 
     return str(filepath)
 
 
-def download_book_cover(url, filename, folder='images/'):
+def download_book_cover(url, filename, folder='images/', skip_img=False, dest_folder=str(Path.cwd())):
     """Функция для скачивания изображений обложек книг.
         Args:
             url (str): Cсылка на изображение обложки, которое хочется скачать.
@@ -110,16 +159,22 @@ def download_book_cover(url, filename, folder='images/'):
         # Returns:
         #     str: Путь до файла, куда сохранёна обложка.
         """
-    Path(f'./{folder}').mkdir(parents=True, exist_ok=True)
+    # Path(f'{dest_folder}/{folder}').mkdir(parents=True, exist_ok=True)
+
+    fff = Path(dest_folder, folder)
+    Path(dest_folder, folder).mkdir(parents=True, exist_ok=True)
 
     response = requests.get(url)
     response.raise_for_status()
     check_for_redirect(response)
 
-    filepath = Path(f'./{folder}/{sanitize_filename(filename)}')
+    # filepath = Path(f'{dest_folder}/{folder}/{sanitize_filename(filename)}')
+    filepath = Path(dest_folder, folder, sanitize_filename(filename))
+    print(filepath)
 
-    with open(filepath, 'wb') as file:
-        file.write(response.content)
+    if not skip_img:
+        with open(filepath, 'wb') as file:
+            file.write(response.content)
 
     return str(filepath)
 
@@ -127,10 +182,28 @@ def download_book_cover(url, filename, folder='images/'):
 def main():
     connection_waiting_seconds = 10
 
-    nf_books = get_list_nf_books()
+    parser = create_parser()
+    args = parser.parse_args()
+
+    if os.path.isdir(str(args.dest_folder)):
+        print('Указанная директория существует. Обработка начинается.')
+    else:
+        parser.print_help()
+
+    category = args.category_page
+    start = args.start_page
+    end = args.end_page
+    dest_folder = str(args.dest_folder)
+    json_path = args.json_path.name,
+    skip_img = args.skip_img,
+    skip_txt = args.skip_txt,
+
+    book_category = category.split('/')[-2]
+
+    nf_books = get_list_nf_books(book_category, start, end)
     nf_books_reduced = [b.split('/')[-2][1:] for b in nf_books]
 
-    print(nf_books_reduced)
+    # print(nf_books_reduced)
 
     # parser = create_parser()
     # if len(sys.argv) < 3:
@@ -153,8 +226,8 @@ def main():
 
                 txt_name = f'{book_id}. {book_title}'
 
-                print(text_path := download_book_txt(book_id, txt_name))
-                print(cover_path := download_book_cover(cover_image_url, cover_image_url.split('/')[-1]))
+                print(text_path := download_book_txt(book_id, txt_name, skip_txt), dest_folder)
+                print(cover_path := download_book_cover(cover_image_url, cover_image_url.split('/')[-1], skip_img, dest_folder))
                 print()
                 print(genres := book_genres if book_genres else 'There is no genres for this book!')
                 print(comments := book_comments if book_comments else 'There is no comments for this book')
@@ -189,7 +262,8 @@ def main():
                 print(f'Book "{txt_name}" loading problem, check the data.')
             number_of_tries -= 1
 
-    with open('./info.json', 'w', encoding='utf-8') as file:
+    path_json_file = Path(f'{dest_folder}/{sanitize_filename(json_path)}')
+    with open('path_json_file', 'a', encoding='utf-8') as file:
         json.dump(books_annotations, file, indent=True, ensure_ascii=False)
 
 
