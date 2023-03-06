@@ -13,7 +13,7 @@ import argparse
 
 def get_list_nf_books():
     lst = []
-    for j in range(1, 5):
+    for j in range(1, 2):
         url = f'https://tululu.org/l55/{j}/'
 
         response = requests.get(url)
@@ -21,10 +21,9 @@ def get_list_nf_books():
 
         soup = BeautifulSoup(response.text, 'lxml')
 
-        x = soup.find_all('table', class_='d_book')
-        for i in x:
-            y = str(i.find('a')).split()
-            link = urljoin('https://tululu.org/', y[1][7:-1])
+        for i in soup.select('table.d_book'):
+            # y = str(i.find('a')).split()
+            link = urljoin('https://tululu.org/', str(i.select('a')).split()[1][7:-1])
             lst.append(link)
 
     return lst
@@ -60,15 +59,18 @@ def parse_book_page(response):
     book_title, book_author = book_title_tag.text.split('::   ')
     book_title = book_title.strip()
 
-    cover_image_tag = soup.find('div', class_='bookimage').find('img')
+    # cover_image_tag = soup.find('div', class_='bookimage').find('img')
+    cover_image_tag = soup.select_one('div.bookimage img')
     cover_image_url = urljoin(response.url, cover_image_tag['src'])
 
-    book_comments_tag = soup.find_all('div', class_='texts')
-    # book_comments = '\n'.join([tag.find('span').text for tag in book_comments_tag])
-    book_comments = [tag.find('span').text for tag in book_comments_tag]
+    # book_comments_tag = soup.find_all('div', class_='texts')
+    ## book_comments = '\n'.join([tag.find('span').text for tag in book_comments_tag])
+    # book_comments = [tag.find('span').text for tag in book_comments_tag]
+    book_comments = [tag.text for tag in soup.select('div.texts span')]
 
-    book_genre_tag = soup.find('span', class_='d_book').find_all('a')
-    book_genres = [tag.text for tag in book_genre_tag]
+    # book_genre_tag = soup.find('span', class_='d_book').find_all('a')
+    # book_genres = [tag.text for tag in book_genre_tag]
+    book_genres = [tag.text for tag in soup.select('span.d_book a')]
 
     return book_title, book_author, cover_image_url, book_comments, book_genres
 
