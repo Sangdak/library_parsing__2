@@ -125,7 +125,6 @@ def download_book_txt(book_id: int, filename: str, destination, folder: str = 'b
             book_id (str): Номер книги, которую хочется скачать.
             filename (str): Имя файла, с которым сохранять.
             destination (str): Папка для сохранения.
-            skip_txt (bool): Флаг пропускать скачивание.
             folder (str): Папка, куда сохранять. По умолчанию "books/"
         Returns:
             str: Путь до файла, куда сохранён текст.
@@ -153,7 +152,6 @@ def download_book_cover(url: str, destination, folder: str = 'images/') -> str:
         Args:
             url (str): Cсылка на изображение обложки, которое хочется скачать.
             destination (str): Папка для сохранения.
-            skip_img (bool): Флаг пропускать скачивание.
             folder (str): Папка, куда сохранять. По умолчанию "images/"
         # Returns (str): Путь до файла, куда сохранёна обложка.
         """
