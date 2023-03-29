@@ -1,37 +1,86 @@
-# import os
 import os.path
-from time import sleep
-import json
-import sys
-import requests
 from pathlib import Path
+from urllib.parse import urlparse, urljoin
 from pathvalidate import sanitize_filename
-from bs4 import BeautifulSoup
-from urllib.parse import urljoin
+from time import sleep
 import argparse
+import json
+
+from bs4 import BeautifulSoup
+import requests
 
 
-def get_list_nf_books(category, start, end):
-    lst = []
-    for j in range(start, end + 1):
-        url = f'https://tululu.org/{category}/{j}/'
+def create_parser():
+    parser = argparse.ArgumentParser(prog='get_books', description='Downloading books by category from "tululu.org".')
 
-        response = requests.get(url)
+    parser.add_argument(
+        '-cat',
+        '--category_page',
+        help='URL to section (genre) of library. For example: "https://tululu.org/l55/" - "Non-fiction" (as default)',
+        type=str,
+        default='https://tululu.org/l55/',
+    )
+    parser.add_argument(
+        '-s',
+        '--start_page',
+        help='Start page for downloading (input a number)',
+        type=int,
+        default=1,
+    )
+    parser.add_argument(
+        '-f',
+        '--finish_page',
+        help='Finish page for downloading (input a number)',
+        type=int,
+        default=1,
+    )
+    parser.add_argument(
+        '-d',
+        '--destination_path',
+        help='Specify directory for saving the results (by default books saves in "books/" and images saves in "images/" in the script folder).',
+        type=str,
+    )
+    parser.add_argument(
+        '-j',
+        '--json_path',
+        help='Specify directory for "results.json" file with results (by default it saves in the script folder).',
+        type=str,
+    )
+    parser.add_argument(
+        '-i',
+        '--skip_images',
+        help='Specify to not download pictures (default is "False").',
+        action='store_true',
+    )
+    parser.add_argument(
+        '-t',
+        '--skip_texts',
+        help='Specify to not download texts (default is "False").',
+        action='store_true',
+    )
+    return parser
+
+
+def get_books_by_category(book_category_id: str, start_page_number: int, end_page_number: int) -> list[str]:
+    book_urls: list = []
+    for page_number in range(start_page_number, end_page_number + 1):
+        category_page_url: str = f'https://tululu.org/{book_category_id}/{page_number}/'
+
+        response = requests.get(category_page_url)
         response.raise_for_status()
         if response.history:
-            print(f'Обработка завершена, подготовлено к скачиванию {j - start} страниц')
+            print(f'Обработка завершена, подготовлено к скачиванию {page_number - start_page_number} страниц')
 
         soup = BeautifulSoup(response.text, 'lxml')
 
-        for i in soup.select('table.d_book'):
-            # y = str(i.find('a')).split()
-            link = urljoin('https://tululu.org/', str(i.select('a')).split()[1][7:-1])
-            lst.append(link)
+        for soup_item in soup.select('table.d_book'):
+            book_url = urljoin('https://tululu.org/', str(soup_item.select('a')).split('/')[1])
+            book_urls.append(book_url)
 
-    return lst
+    return book_urls
 
 
-def get_book_page(book_id):
+def get_book_page(book_id: int):
     site = 'https://tululu.org/'
     url = urljoin(site, f'b{book_id}/')
 
@@ -47,195 +96,134 @@ def check_for_redirect(response):
         raise requests.HTTPError
 
 
-# def create_parser():
-#     parser = argparse.ArgumentParser(description='Скрипт для последовательного скачивания книг с сайта tululu.org ')
-#     parser.add_argument('start_index', help='С какого индекса книги (число) нужно начать скачивание', type=int)
-#     parser.add_argument('end_index', help='Каким индексом книги (число) нужно завершить скачивание', type=int)
-#     return parser
-
-def create_parser():
-    parser = argparse.ArgumentParser(description='Скачивание книг из раздела сайта "tululu.org" ')
-
-    parser.add_argument(
-        '--category_page',
-        help='Ссылка на раздел (жанр) библиотеки. Напр, (по умолч.) "https://tululu.org/l55/" - "фантастика"',
-        default='https://tululu.org/l55/',
-    )
-    parser.add_argument(
-        '--start_page',
-        help='Стартовая страница (:int) для скачивания',
-        type=int, default=1,
-    )
-    parser.add_argument(
-        '--end_page',
-        help='Финишная страница (:int) для для скачивания',
-        type=int, default=1,
-    )
-    parser.add_argument(
-        '--dest_folder',
-        help='Указать свой каталог для сохранения результатов.',
-        type=str,
-    )
-    parser.add_argument(
-        '--json_path',
-        help='Указать свой путь к файлу *.json с результатми.',
-        type=argparse.FileType('w'), default='books_info.json',
-    )
-    parser.add_argument(
-        '--skip_img',
-        help='Указать, чтобы не скачивать картинки.',
-        action='store_true',
-    )
-    parser.add_argument(
-        '--skip_txt',
-        help='Указать, чтобы не скачивать картинки.',
-        action='store_true',
-    )
-    return parser
-
-
-def parse_book_page(response):
+def parse_book_page(response) -> dict:
     soup = BeautifulSoup(response.text, 'lxml')
 
-    book_title_tag = soup.find('h1')
-    book_title, book_author = book_title_tag.text.split('::   ')
-    book_title = book_title.strip()
+    book_title_author_tag = soup.find('h1')
+    book_title, book_author = book_title_author_tag.text.split('::   ')
+    book_title: str = book_title.strip()
+    book_author: str = book_author.strip()
 
-    # cover_image_tag = soup.find('div', class_='bookimage').find('img')
-    cover_image_tag = soup.select_one('div.bookimage img')
-    cover_image_url = urljoin(response.url, cover_image_tag['src'])
+    book_cover_image_tag = soup.select_one('div.bookimage img')
+    book_cover_image_url: str = urljoin(response.url, book_cover_image_tag['src'])
 
-    # book_comments_tag = soup.find_all('div', class_='texts')
-    ## book_comments = '\n'.join([tag.find('span').text for tag in book_comments_tag])
-    # book_comments = [tag.find('span').text for tag in book_comments_tag]
-    book_comments = [tag.text for tag in soup.select('div.texts span')]
+    book_comments: list[str] = [tag.text for tag in soup.select('div.texts span')]
 
-    # book_genre_tag = soup.find('span', class_='d_book').find_all('a')
-    # book_genres = [tag.text for tag in book_genre_tag]
-    book_genres = [tag.text for tag in soup.select('span.d_book a')]
+    book_genres: list[str] = [tag.text for tag in soup.select('span.d_book a')]
 
-    return book_title, book_author, cover_image_url, book_comments, book_genres
+    return {'title': book_title,
+            'author': book_author,
+            'cover_url': book_cover_image_url,
+            'comments': book_comments,
+            'genres': book_genres,
+            }
 
 
-def download_book_txt(book_id, filename, folder='books/', skip_txt=False, dest_folder=str(Path.cwd())):
+def download_book_txt(book_id: int, filename: str, destination, folder: str = 'books/') -> str:
     """Функция для скачивания текстовых файлов.
         Args:
-            # url (str): Cсылка на текст, который хочется скачать.
             book_id (str): Номер книги, которую хочется скачать.
             filename (str): Имя файла, с которым сохранять.
+            destination (str): Папка для сохранения.
+            skip_txt (bool): Флаг пропускать скачивание.
             folder (str): Папка, куда сохранять. По умолчанию "books/"
         Returns:
             str: Путь до файла, куда сохранён текст.
         """
     url = 'https://tululu.org/txt.php'
     payload = {'id': book_id}
-    # Path(f'{dest_folder}/{folder}').mkdir(parents=True, exist_ok=True)
 
-    fff = Path(dest_folder, folder)
-    Path(dest_folder, folder).mkdir(parents=True, exist_ok=True)
+    path = destination / folder
+    path.mkdir(parents=True, exist_ok=True)
 
     response = requests.get(url, params=payload)
     response.raise_for_status()
     check_for_redirect(response)
 
-    # filepath = Path(f'{dest_folder}/{folder}/{sanitize_filename(filename)}.txt')
-    filename = filename + '.txt'
-    filepath = Path(dest_folder, folder, sanitize_filename(filename))
-    print(filepath)
+    filepath = Path(path, sanitize_filename(f'{filename}.txt'))
 
-    if not skip_txt:
-        with open(filepath, 'wb') as file:
-            file.write(response.content)
+    with open(filepath, 'wb') as file:
+        file.write(response.content)
 
     return str(filepath)
 
 
-def download_book_cover(url, filename, folder='images/', skip_img=False, dest_folder=str(Path.cwd())):
+def download_book_cover(url: str, destination, folder: str = 'images/') -> str:
     """Функция для скачивания изображений обложек книг.
         Args:
             url (str): Cсылка на изображение обложки, которое хочется скачать.
-            filename (str): Имя файла, с которым сохранять.
+            destination (str): Папка для сохранения.
+            skip_img (bool): Флаг пропускать скачивание.
             folder (str): Папка, куда сохранять. По умолчанию "images/"
-        # Returns:
-        #     str: Путь до файла, куда сохранёна обложка.
+        # Returns (str): Путь до файла, куда сохранёна обложка.
         """
-    # Path(f'{dest_folder}/{folder}').mkdir(parents=True, exist_ok=True)
 
-    fff = Path(dest_folder, folder)
-    Path(dest_folder, folder).mkdir(parents=True, exist_ok=True)
+    path = destination / folder
+    path.mkdir(parents=True, exist_ok=True)
 
     response = requests.get(url)
     response.raise_for_status()
     check_for_redirect(response)
 
-    # filepath = Path(f'{dest_folder}/{folder}/{sanitize_filename(filename)}')
-    filepath = Path(dest_folder, folder, sanitize_filename(filename))
-    print(filepath)
+    filename = urlparse(url).path.split('/')[-1]
+    filepath = Path(path, sanitize_filename(filename))
 
-    if not skip_img:
-        with open(filepath, 'wb') as file:
-            file.write(response.content)
+    with open(filepath, 'wb') as file:
+        file.write(response.content)
 
     return str(filepath)
 
 
 def main():
-    connection_waiting_seconds = 10
+    connection_waiting_seconds: int = 10
 
     parser = create_parser()
     args = parser.parse_args()
 
-    if os.path.isdir(str(args.dest_folder)):
-        print('Указанная директория существует. Обработка начинается.')
+    category: str = args.category_page
+    start: int = args.start_page
+    end: int = args.finish_page
+    destination_folder = Path(args.destination_path) if args.destination_path else Path.cwd()
+    json_path = Path(args.json_path) if args.json_path else Path.cwd()
+    skip_img = args.skip_images
+    skip_txt = args.skip_texts
+
+    if os.path.isdir(destination_folder) and start <= end:
+        print('Начинается обработка.')
     else:
         parser.print_help()
 
-    category = args.category_page
-    start = args.start_page
-    end = args.end_page
-    dest_folder = str(args.dest_folder)
-    json_path = args.json_path.name,
-    skip_img = args.skip_img,
-    skip_txt = args.skip_txt,
+    books_category: str = category.split('/')[-2]
 
-    book_category = category.split('/')[-2]
+    book_urls: list[str] = get_books_by_category(books_category, start, end)
+    book_id_only_numbers: list[int] = [int(b.split('/')[-1][1:]) for b in book_urls]
 
-    nf_books = get_list_nf_books(book_category, start, end)
-    nf_books_reduced = [b.split('/')[-2][1:] for b in nf_books]
+    books_annotations: list = []
 
-    # print(nf_books_reduced)
-
-    # parser = create_parser()
-    # if len(sys.argv) < 3:
-    #     parser.print_help()
-    # args = parser.parse_args()
-    #
-    # for book_id in range(args.start_index, args.end_index + 1):
-
-    books_annotations = []
-
-    for book_id in nf_books_reduced:
+    for book_id in book_id_only_numbers:
         is_connected = True
-        number_of_tries = 5
+        connection_tries_number = 5
 
-        while number_of_tries > 0:
+        while connection_tries_number:
             try:
+                book_page_response = get_book_page(book_id)
+                book: dict = parse_book_page(book_page_response)
 
-                response = get_book_page(book_id)
-                book_title, book_author, cover_image_url, book_comments, book_genres = parse_book_page(response)
+                txt_name: str = f"{book_id}.{book['title']}"
 
-                txt_name = f'{book_id}. {book_title}'
+                if not skip_txt:
+                    print(text_path := download_book_txt(book_id, txt_name, destination_folder))
 
-                print(text_path := download_book_txt(book_id, txt_name, skip_txt), dest_folder)
-                print(cover_path := download_book_cover(cover_image_url, cover_image_url.split('/')[-1], skip_img, dest_folder))
+                if not skip_img:
+                    print(cover_path := download_book_cover(book['cover_url'], destination_folder))
                 print()
-                print(genres := book_genres if book_genres else 'There is no genres for this book!')
-                print(comments := book_comments if book_comments else 'There is no comments for this book')
+                print(genres := book['genres'] if book['genres'] else 'There is no genres for this book!')
+                print(comments := book['comments'] if book['comments'] else 'There is no comments for this book')
                 print()
 
                 book_describe = {
-                    'title': book_title,
-                    'author': book_author,
+                    'title': book['title'],
+                    'author': book['author'],
                     'img_src': cover_path,
                     'book_path': text_path,
                     'comments': comments,
@@ -257,16 +245,15 @@ def main():
             except requests.HTTPError:
                 print(f"Can't create book {txt_name}, it doesn't exist!")
                 break
-            except Exception as error:
+            except ValueError as error:
                 print(f'Unexpected error: {error}')
                 print(f'Book "{txt_name}" loading problem, check the data.')
-            number_of_tries -= 1
+            connection_tries_number -= 1
 
-    path_json_file = Path(f'{dest_folder}/{sanitize_filename(json_path)}')
-    with open('path_json_file', 'a', encoding='utf-8') as file:
+    json_filepath = Path(json_path) / 'results.json'
+    with open(json_filepath, 'a', encoding='utf-8') as file:
         json.dump(books_annotations, file, indent=True, ensure_ascii=False)
 
 
 if __name__ == '__main__':
     main()
-    # print(*get_list_nf_books(), sep='\n')

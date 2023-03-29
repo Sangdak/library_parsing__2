@@ -27,7 +27,7 @@ pip install -r requirements.txt
 ```
 
 ```Python
-python parse_tululu_category.py
+python parse_tululu.py
 ```
 Running the script without additional parameters will activate the download of all books of a certain category according to the list (by default, "Science Fiction") to the current directory.
 Book texts are stored in the `books` subdirectory, book covers in the `images` subdirectory.
@@ -39,7 +39,7 @@ When running the script, it is recommended to use the following parameters:
 * `--category_page` (str). A link to the selected category is provided (for example, 'https://tululu.org/l55/')
 
 ```python
-python parse_tululu_category.py --category_page https://tululu.org/l55/
+python parse_tululu.py --category_page https://tululu.org/l55/
 ```
 
 * `--start_page` (int). Number of the start page of the category section to download. The default is 1.
@@ -47,8 +47,8 @@ python parse_tululu_category.py --category_page https://tululu.org/l55/
 all pages of the genre to the end.
 
 ```python
-python parse_tululu_category.py --start_page 700
-python parse_tululu_category.py --start_page 700 --end_page 701
+python parse_tululu.py --start_page 700
+python parse_tululu.py --start_page 700 --end_page 701
 
 ```
 * `--dest_folder` (str). Download directory (by default, the root folder of the script).
@@ -60,5 +60,5 @@ python parse_tululu_category.py --start_page 700 --end_page 701
 ## Project Goals
 
 The code is written for educational purposes - this is a lesson 
-in the course on Python and web development on the [Devman] 
-site (https://dvmn.org).
+in the course on Python and web development on the [Devman](https://dvmn.org) 
+site.
