@@ -37,7 +37,8 @@ def create_parser():
     parser.add_argument(
         '-d',
         '--destination_path',
-        help='Specify directory for saving the results (by default books saves in "books/" and images saves in "images/" in the script folder).',
+        help='Specify directory for saving the results (by default books saves in "books/" '
+             'and images saves in "images/" in the script folder).',
         type=str,
     )
     parser.add_argument(
@@ -210,10 +211,10 @@ def main():
                 txt_name: str = f"{book_id}.{book['title']}"
 
                 if not skip_txt:
-                    print(text_path := download_book_txt(book_id, txt_name, destination_folder))
+                    text_path = download_book_txt(book_id, txt_name, destination_folder)
 
                 if not skip_img:
-                    print(cover_path := download_book_cover(book['cover_url'], destination_folder))
+                    cover_path = download_book_cover(book['cover_url'], destination_folder)
                 print()
                 print(genres := book['genres'] if book['genres'] else 'There is no genres for this book!')
                 print(comments := book['comments'] if book['comments'] else 'There is no comments for this book')
@@ -248,7 +249,7 @@ def main():
                 print(f'Book "{txt_name}" loading problem, check the data.')
             connection_tries_number -= 1
 
-    json_filepath = Path(json_path) / 'results.json'
+    json_filepath = os.path.join(json_path, 'results.json')
     with open(json_filepath, 'a', encoding='utf-8') as file:
         json.dump(books_annotations, file, indent=True, ensure_ascii=False)
 
