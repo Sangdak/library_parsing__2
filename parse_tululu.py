@@ -69,8 +69,11 @@ def get_books_by_category(book_category_id: str, start_page_number: int, end_pag
 
         response = requests.get(category_page_url)
         response.raise_for_status()
-        if response.history:
-            print(f'Обработка завершена, подготовлено к скачиванию {page_number - start_page_number} страниц')
+
+        check_for_redirect(response)
+
+        # if response.history:
+        #     print(f'Обработка завершена, подготовлено к скачиванию {page_number - start_page_number} страниц')
 
         soup = BeautifulSoup(response.text, 'lxml')
 
