@@ -2,12 +2,11 @@ import os.path
 from pathlib import Path
 from urllib.parse import urlparse, urljoin
 from pathvalidate import sanitize_filename
-from time import sleep
 import argparse
 import json
-
 from bs4 import BeautifulSoup
 import requests
+from retry import retry
 
 
 def create_parser():
@@ -62,6 +61,7 @@ def create_parser():
     return parser
 
 
+@retry(exceptions=requests.exceptions.ConnectionError, delay=5, tries=5)
 def get_books_by_category(book_category_id: str, start_page_number: int, end_page_number: int) -> list[str]:
     book_urls: list = []
     for page_number in range(start_page_number, end_page_number + 1):
@@ -72,18 +72,16 @@ def get_books_by_category(book_category_id: str, start_page_number: int, end_pag
 
         check_for_redirect(response)
 
-        # if response.history:
-        #     print(f'Обработка завершена, подготовлено к скачиванию {page_number - start_page_number} страниц')
+        bsoup_content = BeautifulSoup(response.text, 'lxml')
 
-        soup = BeautifulSoup(response.text, 'lxml')
-
-        for raw_book_url_string in soup.select('table.d_book'):
+        for raw_book_url_string in bsoup_content.select('table.d_book'):
             book_url = urljoin('https://tululu.org/', str(raw_book_url_string.select('a')).split('/')[1])
             book_urls.append(book_url)
 
     return book_urls
 
 
+@retry(exceptions=requests.exceptions.ConnectionError, delay=5, tries=5)
 def get_book_page(book_id: int):
     site = 'https://tululu.org/'
     url = urljoin(site, f'b{book_id}/')
@@ -123,6 +121,7 @@ def parse_book_page(response) -> dict:
             }
 
 
+@retry(exceptions=requests.exceptions.ConnectionError, delay=5, tries=5)
 def download_book_txt(book_id: int, filename: str, destination: Path, folder: str = 'books/') -> str:
     """Функция для скачивания текстовых файлов.
         Args:
@@ -151,6 +150,7 @@ def download_book_txt(book_id: int, filename: str, destination: Path, folder: st
     return str(filepath)
 
 
+@retry(exceptions=requests.exceptions.ConnectionError, delay=5, tries=5)
 def download_book_cover(url: str, destination: Path, folder: str = 'images/') -> str:
     """Функция для скачивания изображений обложек книг.
         Args:
@@ -177,8 +177,6 @@ def download_book_cover(url: str, destination: Path, folder: str = 'images/') ->
 
 
 def main():
-    connection_waiting_seconds: int = 10
-
     parser = create_parser()
     args = parser.parse_args()
 
@@ -191,17 +189,11 @@ def main():
         'skip_img': args.skip_images,
         'skip_txt': args.skip_texts,
     }
-    # category: str = args.category_page
-    # start: int = args.start_page
-    # end: int = args.finish_page
-    # destination_folder = Path(args.destination_path) if args.destination_path else Path.cwd()
-    # json_path = Path(args.json_path) if args.json_path else Path.cwd()
-    # skip_img = args.skip_images
-    # skip_txt = args.skip_texts
 
-    if os.path.isdir(cli_args['destination_folder']) and cli_args['start'] <= cli_args['end']:
+    if cli_args['start'] <= cli_args['end']:
         print('Начинается обработка.')
     else:
+        print('Пожалуйста, ознакомьтесь со справочной информацией к данному скрипту')
         parser.print_help()
 
     books_category: str = cli_args['category'].split('/')[-2]
@@ -212,57 +204,35 @@ def main():
     books_annotations: list = []
 
     for book_id in book_id_only_numbers:
-        is_connected = True
-        connection_tries_number = 5
+        try:
+            book_page_response = get_book_page(book_id)
+            book: dict = parse_book_page(book_page_response)
 
-        while connection_tries_number:
-            try:
-                book_page_response = get_book_page(book_id)
-                book: dict = parse_book_page(book_page_response)
+            txt_name: str = f"{book_id}.{book['title']}"
 
-                txt_name: str = f"{book_id}.{book['title']}"
+            genres = book['genres'] if book['genres'] else 'There is no genres for this book!'
+            comments = book['comments'] if book['comments'] else 'There is no comments for this book'
 
-                genres = book['genres'] if book['genres'] else 'There is no genres for this book!'
-                comments = book['comments'] if book['comments'] else 'There is no comments for this book'
+            book_describe = {
+                'title': book['title'],
+                'author': book['author'],
+                'comments': comments,
+                'genres': genres,
+            }
 
-                book_describe = {
-                    'title': book['title'],
-                    'author': book['author'],
-                    # 'img_src': cover_path,
-                    # 'book_path': text_path,
-                    'comments': comments,
-                    'genres': genres,
-                }
+            if not cli_args['skip_txt']:
+                text_path = download_book_txt(book_id, txt_name, cli_args['destination_folder'])
+                book_describe['book_path'] = text_path
 
-                if not cli_args['skip_txt']:
-                    text_path = download_book_txt(book_id, txt_name, cli_args['destination_folder'])
-                    book_describe['book_path'] = text_path
+            if not cli_args['skip_img']:
+                cover_path = download_book_cover(book['cover_url'], cli_args['destination_folder'])
+                book_describe['img_src'] = cover_path
 
-                if not cli_args['skip_img']:
-                    cover_path = download_book_cover(book['cover_url'], cli_args['destination_folder'])
-                    book_describe['img_src'] = cover_path
+            if os.path.exists(book_describe['book_path']):
+                books_annotations.append(book_describe)
 
-                if os.path.exists(book_describe['text_path']):
-                    books_annotations.append(book_describe)
-                break
-
-            except requests.ConnectionError:
-                if is_connected:
-                    is_connected = False
-                    print(f'Unsuccessful connection attempt. Pending connection retry.')
-                else:
-                    print('Missing connection')
-                    print(f'Retrying connection via {connection_waiting_seconds} seconds.')
-                    sleep(connection_waiting_seconds)
-
-            except requests.HTTPError:
-                print(f"Can't create book {txt_name}, it doesn't exist!")
-                break
-
-            except ValueError as error:
-                print(f'Unexpected error: {error}')
-                print(f'Book "{txt_name}" loading problem, check the data.')
-            connection_tries_number -= 1
+        except requests.HTTPError:
+            print(f"Can't create book, it doesn't exist!")
 
     json_filepath = os.path.join(cli_args['json_path'], 'results.json')
     with open(json_filepath, 'a', encoding='utf-8') as file:
