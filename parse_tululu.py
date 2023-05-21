@@ -10,12 +10,16 @@ from retry import retry
 
 
 def create_parser():
-    parser = argparse.ArgumentParser(prog='get_books', description='Downloading books by category from "tululu.org".')
+    parser = argparse.ArgumentParser(
+        prog='get_books',
+        description='Downloading books by category from "tululu.org".',
+    )
 
     parser.add_argument(
         '-cat',
         '--category_page',
-        help='URL to section (genre) of library. For example: "https://tululu.org/l55/" - "Non-fiction" (as default)',
+        help='URL to section (genre) of library. For example: '
+             '"https://tululu.org/l55/" - "Non-fiction" (as default)',
         type=str,
         default='https://tululu.org/l55/',
     )
@@ -36,14 +40,16 @@ def create_parser():
     parser.add_argument(
         '-d',
         '--destination_path',
-        help='Specify directory for saving the results (by default books saves in "books/" '
+        help='Specify directory for saving the results '
+             '(by default books saves in "books/" '
              'and images saves in "images/" in the script folder).',
         type=str,
     )
     parser.add_argument(
         '-j',
         '--json_path',
-        help='Specify directory for "results.json" file with results (by default it saves in the script folder).',
+        help='Specify directory for "results.json" file with results '
+             '(by default it saves in the script folder).',
         type=str,
     )
     parser.add_argument(
@@ -62,10 +68,15 @@ def create_parser():
 
 
 @retry(exceptions=requests.exceptions.ConnectionError, delay=5, tries=5)
-def get_books_by_category(book_category_id: str, start_page_number: int, end_page_number: int) -> list[str]:
+def get_books_by_category(
+        book_category_id: str,
+        start_page_number: int,
+        end_page_number: int
+) -> list[str]:
     book_urls: list = []
     for page_number in range(start_page_number, end_page_number + 1):
-        category_page_url: str = f'https://tululu.org/{book_category_id}/{page_number}/'
+        category_page_url: str = \
+            f'https://tululu.org/{book_category_id}/{page_number}/'
 
         response = requests.get(category_page_url)
         response.raise_for_status()
@@ -75,7 +86,10 @@ def get_books_by_category(book_category_id: str, start_page_number: int, end_pag
         bsoup_content = BeautifulSoup(response.text, 'lxml')
 
         for raw_book_url_string in bsoup_content.select('table.d_book'):
-            book_url = urljoin(response.url, str(raw_book_url_string.select('a')).split('/')[1])
+            book_url = urljoin(
+                response.url,
+                str(raw_book_url_string.select('a')).split('/')[1],
+            )
             book_urls.append(book_url)
 
     return book_urls
@@ -107,9 +121,11 @@ def parse_book_page(response) -> dict:
     book_author: str = book_author.strip()
 
     book_cover_image_tag = soup.select_one('div.bookimage img')
-    book_cover_image_url: str = urljoin(response.url, book_cover_image_tag['src'])
+    book_cover_image_url: str = \
+        urljoin(response.url, book_cover_image_tag['src'])
 
-    book_comments: list[str] = [tag.text for tag in soup.select('div.texts span')]
+    book_comments: list[str] = \
+        [tag.text for tag in soup.select('div.texts span')]
 
     book_genres: list[str] = [tag.text for tag in soup.select('span.d_book a')]
 
@@ -122,7 +138,12 @@ def parse_book_page(response) -> dict:
 
 
 @retry(exceptions=requests.exceptions.ConnectionError, delay=5, tries=5)
-def download_book_txt(book_id: int, filename: str, destination: Path, folder: str = 'books/') -> str:
+def download_book_txt(
+        book_id: int,
+        filename: str,
+        destination: Path,
+        folder: str = 'books/'
+) -> str:
     """Функция для скачивания текстовых файлов.
         Args:
             book_id (str): Номер книги, которую хочется скачать.
@@ -151,7 +172,11 @@ def download_book_txt(book_id: int, filename: str, destination: Path, folder: st
 
 
 @retry(exceptions=requests.exceptions.ConnectionError, delay=5, tries=5)
-def download_book_cover(url: str, destination: Path, folder: str = 'images/') -> str:
+def download_book_cover(
+        url: str,
+        destination: Path,
+        folder: str = 'images/'
+) -> str:
     """Функция для скачивания изображений обложек книг.
         Args:
             url (str): Cсылка на изображение обложки, которое хочется скачать.
@@ -184,7 +209,8 @@ def main():
         'category': args.category_page,
         'start': args.start_page,
         'end': args.finish_page,
-        'destination_folder': Path(args.destination_path) if args.destination_path else Path.cwd(),
+        'destination_folder': Path(args.destination_path)
+        if args.destination_path else Path.cwd(),
         'json_path': Path(args.json_path) if args.json_path else Path.cwd(),
         'skip_img': args.skip_images,
         'skip_txt': args.skip_texts,
@@ -193,13 +219,20 @@ def main():
     if cli_args['start'] <= cli_args['end']:
         print('Начинается обработка.')
     else:
-        print('Пожалуйста, ознакомьтесь со справочной информацией к данному скрипту')
+        print(
+            'Пожалуйста, ознакомьтесь со справочной информацией '
+            'к данному скрипту',
+        )
         parser.print_help()
 
     books_category: str = cli_args['category'].split('/')[-2]
 
-    book_urls: list[str] = get_books_by_category(books_category, cli_args['start'], cli_args['end'])
-    book_id_only_numbers: list[int] = [int(b.split('/')[-1][1:]) for b in book_urls]
+    book_urls: list[str] = get_books_by_category(
+        books_category,
+        cli_args['start'], cli_args['end'],
+    )
+    book_id_only_numbers: list[int] = \
+        [int(b.split('/')[-1][1:]) for b in book_urls]
 
     books_annotations: list = []
 
@@ -210,8 +243,10 @@ def main():
 
             txt_name: str = f"{book_id}.{book['title']}"
 
-            genres = book['genres'] if book['genres'] else 'There is no genres for this book!'
-            comments = book['comments'] if book['comments'] else 'There is no comments for this book'
+            genres = book['genres'] if book['genres'] \
+                else 'There is no genres for this book!'
+            comments = book['comments'] if book['comments'] \
+                else 'There is no comments for this book'
 
             book_describe = {
                 'title': book['title'],
@@ -221,18 +256,25 @@ def main():
             }
 
             if not cli_args['skip_txt']:
-                text_path = download_book_txt(book_id, txt_name, cli_args['destination_folder'])
+                text_path = download_book_txt(
+                    book_id,
+                    txt_name,
+                    cli_args['destination_folder'],
+                )
                 book_describe['book_path'] = text_path
 
             if not cli_args['skip_img']:
-                cover_path = download_book_cover(book['cover_url'], cli_args['destination_folder'])
+                cover_path = download_book_cover(
+                    book['cover_url'],
+                    cli_args['destination_folder'],
+                )
                 book_describe['img_src'] = cover_path
 
             if os.path.exists(book_describe['book_path']):
                 books_annotations.append(book_describe)
 
         except requests.HTTPError:
-            print(f"Can't create book, it doesn't exist!")
+            print("Can't create book, it doesn't exist!")
 
     json_filepath = os.path.join(cli_args['json_path'], 'results.json')
     with open(json_filepath, 'a', encoding='utf-8') as file:
