@@ -75,7 +75,7 @@ def get_books_by_category(book_category_id: str, start_page_number: int, end_pag
         bsoup_content = BeautifulSoup(response.text, 'lxml')
 
         for raw_book_url_string in bsoup_content.select('table.d_book'):
-            book_url = urljoin('https://tululu.org/', str(raw_book_url_string.select('a')).split('/')[1])
+            book_url = urljoin(response.url, str(raw_book_url_string.select('a')).split('/')[1])
             book_urls.append(book_url)
 
     return book_urls
