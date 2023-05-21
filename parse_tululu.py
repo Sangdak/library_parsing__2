@@ -123,7 +123,7 @@ def parse_book_page(response) -> dict:
             }
 
 
-def download_book_txt(book_id: int, filename: str, destination, folder: str = 'books/') -> str:
+def download_book_txt(book_id: int, filename: str, destination: Path, folder: str = 'books/') -> str:
     """Функция для скачивания текстовых файлов.
         Args:
             book_id (str): Номер книги, которую хочется скачать.
@@ -151,7 +151,7 @@ def download_book_txt(book_id: int, filename: str, destination, folder: str = 'b
     return str(filepath)
 
 
-def download_book_cover(url: str, destination, folder: str = 'images/') -> str:
+def download_book_cover(url: str, destination: Path, folder: str = 'images/') -> str:
     """Функция для скачивания изображений обложек книг.
         Args:
             url (str): Cсылка на изображение обложки, которое хочется скачать.
@@ -182,22 +182,31 @@ def main():
     parser = create_parser()
     args = parser.parse_args()
 
-    category: str = args.category_page
-    start: int = args.start_page
-    end: int = args.finish_page
-    destination_folder = Path(args.destination_path) if args.destination_path else Path.cwd()
-    json_path = Path(args.json_path) if args.json_path else Path.cwd()
-    skip_img = args.skip_images
-    skip_txt = args.skip_texts
+    cli_args = {
+        'category': args.category_page,
+        'start': args.start_page,
+        'end': args.finish_page,
+        'destination_folder': Path(args.destination_path) if args.destination_path else Path.cwd(),
+        'json_path': Path(args.json_path) if args.json_path else Path.cwd(),
+        'skip_img': args.skip_images,
+        'skip_txt': args.skip_texts,
+    }
+    # category: str = args.category_page
+    # start: int = args.start_page
+    # end: int = args.finish_page
+    # destination_folder = Path(args.destination_path) if args.destination_path else Path.cwd()
+    # json_path = Path(args.json_path) if args.json_path else Path.cwd()
+    # skip_img = args.skip_images
+    # skip_txt = args.skip_texts
 
-    if os.path.isdir(destination_folder) and start <= end:
+    if os.path.isdir(cli_args['destination_folder']) and cli_args['start'] <= cli_args['end']:
         print('Начинается обработка.')
     else:
         parser.print_help()
 
-    books_category: str = category.split('/')[-2]
+    books_category: str = cli_args['category'].split('/')[-2]
 
-    book_urls: list[str] = get_books_by_category(books_category, start, end)
+    book_urls: list[str] = get_books_by_category(books_category, cli_args['start'], cli_args['end'])
     book_id_only_numbers: list[int] = [int(b.split('/')[-1][1:]) for b in book_urls]
 
     books_annotations: list = []
@@ -213,29 +222,30 @@ def main():
 
                 txt_name: str = f"{book_id}.{book['title']}"
 
-                if not skip_txt:
-                    text_path = download_book_txt(book_id, txt_name, destination_folder)
-
-                if not skip_img:
-                    cover_path = download_book_cover(book['cover_url'], destination_folder)
-                print()
-                print(genres := book['genres'] if book['genres'] else 'There is no genres for this book!')
-                print(comments := book['comments'] if book['comments'] else 'There is no comments for this book')
-                print()
+                genres = book['genres'] if book['genres'] else 'There is no genres for this book!'
+                comments = book['comments'] if book['comments'] else 'There is no comments for this book'
 
                 book_describe = {
                     'title': book['title'],
                     'author': book['author'],
-                    'img_src': cover_path,
-                    'book_path': text_path,
+                    # 'img_src': cover_path,
+                    # 'book_path': text_path,
                     'comments': comments,
                     'genres': genres,
                 }
 
-                if os.path.exists(text_path):
-                    books_annotations.append(book_describe)
+                if not cli_args['skip_txt']:
+                    text_path = download_book_txt(book_id, txt_name, cli_args['destination_folder'])
+                    book_describe['book_path'] = text_path
 
+                if not cli_args['skip_img']:
+                    cover_path = download_book_cover(book['cover_url'], cli_args['destination_folder'])
+                    book_describe['img_src'] = cover_path
+
+                if os.path.exists(book_describe['text_path']):
+                    books_annotations.append(book_describe)
                 break
+
             except requests.ConnectionError:
                 if is_connected:
                     is_connected = False
@@ -244,15 +254,17 @@ def main():
                     print('Missing connection')
                     print(f'Retrying connection via {connection_waiting_seconds} seconds.')
                     sleep(connection_waiting_seconds)
+
             except requests.HTTPError:
                 print(f"Can't create book {txt_name}, it doesn't exist!")
                 break
+
             except ValueError as error:
                 print(f'Unexpected error: {error}')
                 print(f'Book "{txt_name}" loading problem, check the data.')
             connection_tries_number -= 1
 
-    json_filepath = os.path.join(json_path, 'results.json')
+    json_filepath = os.path.join(cli_args['json_path'], 'results.json')
     with open(json_filepath, 'a', encoding='utf-8') as file:
         json.dump(books_annotations, file, indent=True, ensure_ascii=False)
 
