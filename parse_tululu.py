@@ -2,6 +2,7 @@ import os.path
 from pathlib import Path
 from urllib.parse import urlparse, urljoin
 from pathvalidate import sanitize_filename
+from time import sleep
 import argparse
 import json
 from bs4 import BeautifulSoup
@@ -232,48 +233,73 @@ def main():
     books_annotations: list = []
 
     for book_id in book_number_ids:
-        try:
-            book_page_response = get_book_page(book_id)
-            book: dict = parse_book_page(book_page_response)
+        number_of_connection_attempts = 5
 
-            txt_name: str = f"{book_id}.{book['title']}"
+        while number_of_connection_attempts:
 
-            genres = book['genres'] if book['genres'] \
-                else 'There is no genres for this book!'
-            comments = book['comments'] if book['comments'] \
-                else 'There is no comments for this book'
+            try:
+                book_page_response = get_book_page(book_id)
+                book: dict = parse_book_page(book_page_response)
 
-            book_describe = {
-                'title': book['title'],
-                'author': book['author'],
-                'comments': comments,
-                'genres': genres,
-            }
+                txt_name: str = f"{book_id}.{book['title']}"
 
-            if not cli_args['skip_txt']:
-                text_path = download_book_txt(
-                    book_id,
-                    txt_name,
-                    cli_args['destination_folder'],
-                )
-                book_describe['book_path'] = text_path
+                genres = book['genres'] if book['genres'] \
+                    else 'There is no genres for this book!'
+                comments = book['comments'] if book['comments'] \
+                    else 'There is no comments for this book'
 
-            if not cli_args['skip_img']:
-                cover_path = download_book_cover(
-                    book['cover_url'],
-                    cli_args['destination_folder'],
-                )
-                book_describe['img_src'] = cover_path
+                book_describe = {
+                    'title': book['title'],
+                    'author': book['author'],
+                    'comments': comments,
+                    'genres': genres,
+                }
 
-            if os.path.exists(book_describe['book_path']):
-                books_annotations.append(book_describe)
+                if not cli_args['skip_txt']:
+                    text_path = download_book_txt(
+                        book_id,
+                        txt_name,
+                        cli_args['destination_folder'],
+                    )
+                    book_describe['book_path'] = text_path
 
-        except requests.HTTPError:
-            print("Can't create book, it doesn't exist!")
+                if not cli_args['skip_img']:
+                    cover_path = download_book_cover(
+                        book['cover_url'],
+                        cli_args['destination_folder'],
+                    )
+                    book_describe['img_src'] = cover_path
+
+                if os.path.exists(book_describe['book_path']):
+                    books_annotations.append(book_describe)
+
+                break
+
+            except requests.HTTPError as exc_http:
+                print('Can\'t create book. Maybe it doesn\'t exist!')
+
+                break
+
+            except requests.ConnectionError as exc_con:
+                print('There is a problem with the network connection,\n'
+                      'and all attempts to reconnect have been exhausted.\n'
+                      'Try again later or contact your administrator.')
+
+                print('Number of connection attempts: ', number_of_connection_attempts)
+                print('Waiting 5 seconds before retry.')
+                sleep(5)
+
+                number_of_connection_attempts -= 1
+
+            except Exception as exc:
+                print(exc.args[0], exc.args[1])
 
     json_filepath = os.path.join(cli_args['json_path'], 'results.json')
     with open(json_filepath, 'a', encoding='utf-8') as file:
         json.dump(books_annotations, file, indent=True, ensure_ascii=False)
+
+    print('Работа программы завершена')
+    exit()
 
 
 if __name__ == '__main__':
