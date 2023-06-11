@@ -6,7 +6,6 @@ import argparse
 import json
 from bs4 import BeautifulSoup
 import requests
-from retry import retry
 
 
 def create_parser():
@@ -67,7 +66,6 @@ def create_parser():
     return parser
 
 
-@retry(exceptions=requests.exceptions.ConnectionError, delay=5, tries=5)
 def get_books_by_category(
         book_category_id: str,
         start_page_number: int,
@@ -95,7 +93,6 @@ def get_books_by_category(
     return book_urls
 
 
-@retry(exceptions=requests.exceptions.ConnectionError, delay=5, tries=5)
 def get_book_page(book_id: int):
     site = 'https://tululu.org/'
     url = urljoin(site, f'b{book_id}/')
@@ -137,7 +134,6 @@ def parse_book_page(response) -> dict:
             }
 
 
-@retry(exceptions=requests.exceptions.ConnectionError, delay=5, tries=5)
 def download_book_txt(
         book_id: int,
         filename: str,
@@ -171,7 +167,6 @@ def download_book_txt(
     return str(filepath)
 
 
-@retry(exceptions=requests.exceptions.ConnectionError, delay=5, tries=5)
 def download_book_cover(
         url: str,
         destination: Path,
