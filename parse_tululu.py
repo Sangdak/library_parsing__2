@@ -226,12 +226,12 @@ def main():
         books_category,
         cli_args['start'], cli_args['end'],
     )
-    book_id_only_numbers: list[int] = \
+    book_number_ids: list[int] = \
         [int(b.split('/')[-1][1:]) for b in book_urls]
 
     books_annotations: list = []
 
-    for book_id in book_id_only_numbers:
+    for book_id in book_number_ids:
         try:
             book_page_response = get_book_page(book_id)
             book: dict = parse_book_page(book_page_response)
