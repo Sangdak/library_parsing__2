@@ -1,12 +1,12 @@
 import os.path
+from time import sleep
 from pathlib import Path
 from urllib.parse import urlparse, urljoin
 from pathvalidate import sanitize_filename
-from time import sleep
 import argparse
-import json
-from bs4 import BeautifulSoup
 import requests
+from bs4 import BeautifulSoup
+import json
 
 
 def create_parser():
@@ -141,15 +141,18 @@ def download_book_txt(
         destination: Path,
         folder: str = 'books/'
 ) -> str:
-    """Функция для скачивания текстовых файлов.
-        Args:
-            book_id (str): Номер книги, которую хочется скачать.
-            filename (str): Имя файла, с которым сохранять.
-            destination (str): Папка для сохранения.
-            folder (str): Папка, куда сохранять. По умолчанию "books/"
-        Returns:
-            str: Путь до файла, куда сохранён текст.
-        """
+    """Скачать текстовый файл книги.
+
+    Args:
+        book_id (str): Номер скачиваемой книги на сайте.
+        filename (str): Имя сохраняемого файла.
+        destination (str): Путь для сохранения.
+        folder (str): Папка для сохранения. По умолчанию `books/`.
+
+    Returns:
+        str: Путь до сохранённого файла.
+
+    """
     url = 'https://tululu.org/txt.php'
     payload = {'id': book_id}
 
@@ -173,14 +176,17 @@ def download_book_cover(
         destination: Path,
         folder: str = 'images/'
 ) -> str:
-    """Функция для скачивания изображений обложек книг.
-        Args:
-            url (str): Cсылка на изображение обложки, которое хочется скачать.
-            destination (str): Папка для сохранения.
-            folder (str): Папка, куда сохранять. По умолчанию "images/"
-        # Returns (str): Путь до файла, куда сохранёна обложка.
-        """
+    """Скачать изображения обложек книг.
 
+    Args:
+        url (str): Ссылка на изображение обложки, которое необходимо скачать.
+        destination (Path): Путь для сохранения.
+        folder (str): Папка, куда сохранять. По умолчанию "images/"
+
+    Returns:
+        filepath (str): Путь до файла изображения обложки.
+
+    """
     path = destination / folder
     path.mkdir(parents=True, exist_ok=True)
 
@@ -275,24 +281,36 @@ def main():
 
                 break
 
-            except requests.HTTPError as exc_http:
+            except requests.HTTPError:
                 print('Can\'t create book. Maybe it doesn\'t exist!')
 
                 break
 
-            except requests.ConnectionError as exc_con:
+            except requests.ConnectionError:
                 print('There is a problem with the network connection,\n'
                       'and all attempts to reconnect have been exhausted.\n'
                       'Try again later or contact your administrator.')
 
-                print('Number of connection attempts: ', number_of_connection_attempts)
-                print('Waiting 5 seconds before retry.')
-                sleep(5)
+                print('Number of connection attempts: ',
+                      number_of_connection_attempts,
+                      )
+                print('Waiting 10 seconds before retry.')
+                print()
+                sleep(10)
 
                 number_of_connection_attempts -= 1
 
             except Exception as exc:
                 print(exc.args[0], exc.args[1])
+
+                print('Number of connection attempts: ',
+                      number_of_connection_attempts,
+                      )
+                print('Waiting 10 seconds before retry.')
+                print()
+                sleep(5)
+
+                number_of_connection_attempts -= 1
 
     json_filepath = os.path.join(cli_args['json_path'], 'results.json')
     with open(json_filepath, 'a', encoding='utf-8') as file:
