@@ -66,7 +66,7 @@ def create_parser():
     return parser
 
 
-def get_books_by_category(
+def get_book_urls_by_category(
         book_category_id: str,
         start_page_number: int,
         end_page_number: int
@@ -222,7 +222,7 @@ def main():
 
     books_category: str = cli_args['category'].split('/')[-2]
 
-    book_urls: list[str] = get_books_by_category(
+    book_urls: list[str] = get_book_urls_by_category(
         books_category,
         cli_args['start'], cli_args['end'],
     )
