@@ -207,18 +207,7 @@ def main():
     parser = create_parser()
     args = parser.parse_args()
 
-    cli_args = {
-        'category': args.category_page,
-        'start': args.start_page,
-        'end': args.finish_page,
-        'destination_folder': Path(args.destination_path)
-        if args.destination_path else Path.cwd(),
-        'json_path': Path(args.json_path) if args.json_path else Path.cwd(),
-        'skip_img': args.skip_images,
-        'skip_txt': args.skip_texts,
-    }
-
-    if cli_args['start'] <= cli_args['end']:
+    if args.start_page <= args.finish_page:
         print('Начинается обработка.')
     else:
         print(
@@ -227,11 +216,11 @@ def main():
         )
         parser.print_help()
 
-    books_category: str = cli_args['category'].split('/')[-2]
+    books_category: str = args.category_page.split('/')[-2]
 
     book_urls: list[str] = get_book_urls_by_category(
         books_category,
-        cli_args['start'], cli_args['end'],
+        args.start_page, args.finish_page,
     )
     book_number_ids: list[int] = \
         [int(b.split('/')[-1][1:]) for b in book_urls]
@@ -261,18 +250,20 @@ def main():
                     'genres': genres,
                 }
 
-                if not cli_args['skip_txt']:
+                if not args.skip_texts:
                     text_path = download_book_txt(
                         book_id,
                         txt_name,
-                        cli_args['destination_folder'],
+                        Path(args.destination_path)
+                        if args.destination_path else Path.cwd(),
                     )
                     book_describe['book_path'] = text_path
 
-                if not cli_args['skip_img']:
+                if not args.skip_images:
                     cover_path = download_book_cover(
                         book['cover_url'],
-                        cli_args['destination_folder'],
+                        Path(args.destination_path)
+                        if args.destination_path else Path.cwd(),
                     )
                     book_describe['img_src'] = cover_path
 
@@ -300,19 +291,22 @@ def main():
 
                 number_of_connection_attempts -= 1
 
-            except Exception as exc:
-                print(exc.args[0], exc.args[1])
+            # except Exception as exc:
+            #     print(exc.args[0], exc.args[1])
+            #
+            #     print('Number of connection attempts: ',
+            #           number_of_connection_attempts,
+            #           )
+            #     print('Waiting 10 seconds before retry.')
+            #     print()
+            #     sleep(5)
+            #
+            #     number_of_connection_attempts -= 1
 
-                print('Number of connection attempts: ',
-                      number_of_connection_attempts,
-                      )
-                print('Waiting 10 seconds before retry.')
-                print()
-                sleep(5)
-
-                number_of_connection_attempts -= 1
-
-    json_filepath = os.path.join(cli_args['json_path'], 'results.json')
+    json_filepath = os.path.join(
+        Path(args.json_path) if args.json_path else Path.cwd(),
+        'results.json'
+    )
     with open(json_filepath, 'a', encoding='utf-8') as file:
         json.dump(books_annotations, file, indent=True, ensure_ascii=False)
 
