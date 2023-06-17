@@ -74,22 +74,34 @@ def get_book_urls_by_category(
 ) -> list[str]:
     book_urls: list = []
     for page_number in range(start_page_number, end_page_number + 1):
-        category_page_url: str = \
-            f'https://tululu.org/{book_category_id}/{page_number}/'
+        page_handling_attempts = 5
+        while page_handling_attempts:
+            try:
+                category_page_url: str = \
+                    f'https://tululu.org/{book_category_id}/{page_number}/'
+                response = requests.get(category_page_url)
+                response.raise_for_status()
+                check_for_redirect(response)
 
-        response = requests.get(category_page_url)
-        response.raise_for_status()
+                bsoup_content = BeautifulSoup(response.text, 'lxml')
 
-        check_for_redirect(response)
+                for raw_book_url_string in bsoup_content.select('table.d_book'):
+                    book_url = urljoin(
+                        response.url,
+                        str(raw_book_url_string.select('a')).split('/')[1],
+                    )
+                    book_urls.append(book_url)
 
-        bsoup_content = BeautifulSoup(response.text, 'lxml')
-
-        for raw_book_url_string in bsoup_content.select('table.d_book'):
-            book_url = urljoin(
-                response.url,
-                str(raw_book_url_string.select('a')).split('/')[1],
-            )
-            book_urls.append(book_url)
+            except requests.ConnectionError:
+                print(f'Не удалось извлечь данные со страницы #{page_number}. '
+                'Проверьте состояние вашего интернет-соединения.')
+                print(f'Выполняется повторная попытка обработки страницы #{page_number}')
+                print(f'Количество оставшихся попыток переподключения: '
+                f'{page_handling_attempts}/5.')
+                sleep(10)
+                page_handling_attempts -= 1
+            else:
+                page_handling_attempts = False
 
     return book_urls
 
