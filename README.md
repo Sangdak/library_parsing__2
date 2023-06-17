@@ -42,19 +42,19 @@ When running the script, it is recommended to use the following parameters:
 python parse_tululu.py --category_page https://tululu.org/l55/
 ```
 
-* `--start_page` (int). Number of the start page of the category section to download. The default is 1.
-* `--end_page` (int). The end page of the genre section to download. If not specified, it will download
+* `--start_page`, `-s` (int). Number of the start page of the category section to download. The default is 1.
+* `--finish_page`, `-f` (int). The end page of the genre section to download. If not specified, it will download
 all pages of the genre to the end.
 
 ```python
 python parse_tululu.py --start_page 700
-python parse_tululu.py --start_page 700 --end_page 701
-
+python parse_tululu.py --start_page 700 --finish_page 701
 ```
-* `--dest_folder` (str). Download directory (by default, the root folder of the script).
-* `--path_json` (str). The name of the file to upload the result. Default: `books_info.json`.
-* `--skip_img`. Specify a "flag" to not upload book covers.
-* `--skip_txt`. Specify a "flag" to not download book texts.
+
+* `--destination_path`, `-d` (str). Download directory (by default, the root folder of the script).
+* `--json_path`, `-j` (str). The name of the file to upload the result. Default: `books_info.json`.
+* `--skip_images`, `-i` Specify a "flag" to not upload book covers.
+* `--skip_texts`, `-t` Specify a "flag" to not download book texts.
 
 
 ## Project Goals
