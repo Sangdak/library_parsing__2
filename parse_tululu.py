@@ -303,18 +303,6 @@ def main():
 
                 number_of_connection_attempts -= 1
 
-            # except Exception as exc:
-            #     print(exc.args[0], exc.args[1])
-            #
-            #     print('Number of connection attempts: ',
-            #           number_of_connection_attempts,
-            #           )
-            #     print('Waiting 10 seconds before retry.')
-            #     print()
-            #     sleep(5)
-            #
-            #     number_of_connection_attempts -= 1
-
     json_filepath = os.path.join(
         Path(args.json_path) if args.json_path else Path.cwd(),
         'results.json'
