@@ -100,6 +100,14 @@ def get_book_urls_by_category(
                 f'{page_handling_attempts}/5.')
                 sleep(10)
                 page_handling_attempts -= 1
+            except requests.HTTPError:
+                print(f'Не удалось извлечь данные со страницы #{page_number}. '
+                'Проверьте есть ли у вас требуемые  права доступа и существует ли страница .')
+                print(f'Выполняется повторная попытка обработки страницы #{page_number}')
+                print(f'Количество оставшихся попыток переподключения: '
+                f'{page_handling_attempts}/5.')
+                sleep(10)
+                page_handling_attempts -= 1
             else:
                 page_handling_attempts = False
 
